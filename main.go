@@ -11,19 +11,37 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type WRequest struct {
-	Address string `json:"address"`
-	Data    string `json:"data"`
-}
+type (
+	QuestAnswer struct {
+		Quest  string `json:"quest"`
+		Answer string `json:"answer"`
+	}
 
-type WResponse struct {
+	UploadFormReq struct {
+		Address      string        `json:"address"`
+		QuestAnswers []QuestAnswer `json:"quest_answers"`
+	}
+
+	UploadFormRes struct {
+	}
+
+	CheckIsRegisteredReq struct {
+		Address string `json:"address"`
+	}
+
+	CheckIsRegisteredRes struct {
+		Result bool `json:"result"`
+	}
+)
+
+type Msg struct {
 	Code    uint32      `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data"`
 }
 
-func NewResponse(code uint32, message string, data interface{}) *WResponse {
-	return &WResponse{
+func NewMsg(code uint32, message string, data interface{}) *Msg {
+	return &Msg{
 		Code:    code,
 		Message: message,
 		Data:    data,
@@ -32,9 +50,11 @@ func NewResponse(code uint32, message string, data interface{}) *WResponse {
 
 func main() {
 	r := gin.Default()
+	r.Use(Cors())
+
 	r.GET("/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
-			"msg": NewResponse(0, "success", "pong"),
+			"msg": NewMsg(0, "success", "pong"),
 		})
 	})
 
@@ -49,19 +69,43 @@ func main() {
 	r.POST("/uploadForm", func(context *gin.Context) {
 		data, _ := ioutil.ReadAll(context.Request.Body)
 
-		req := WRequest{}
+		req := UploadFormReq{}
 		if err := json.Unmarshal(data, &req); err != nil {
 			context.JSON(200, gin.H{
-				"msg": NewResponse(1, "invalid request", nil),
+				"msg": NewMsg(1, "invalid request", nil),
 			})
 			return
 		}
 
-		saver.write(fmt.Sprintf("%s,%s\n", req.Address, req.Data))
+		if saver.Exist(req.Address) {
+			context.JSON(200, gin.H{
+				"msg": NewMsg(2, "already registered", nil)})
+			return
+
+		}
+
+		afterMarshal, _ := json.Marshal(req)
+
+		saver.write(req.Address, string(afterMarshal))
 
 		context.JSON(200, gin.H{
-			"msg": NewResponse(0, "success", nil),
+			"msg": NewMsg(0, "success", &UploadFormRes{}),
 		})
+	})
+
+	r.POST("/checkIsRegistered", func(context *gin.Context) {
+		data, _ := ioutil.ReadAll(context.Request.Body)
+
+		req := CheckIsRegisteredReq{}
+		if err := json.Unmarshal(data, &req); err != nil {
+			context.JSON(200, gin.H{
+				"msg": NewMsg(1, "invalid request", nil),
+			})
+			return
+		}
+
+		context.JSON(200, gin.H{
+			"msg": NewMsg(0, "success", &CheckIsRegisteredRes{Result: saver.Exist(req.Address)})})
 	})
 
 	go r.Run()
