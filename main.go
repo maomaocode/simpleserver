@@ -34,16 +34,22 @@ type (
 	}
 )
 
+type Meta struct {
+	ErrCode uint32 `json:"err_code"`
+	ErrMsg  string `json:"err_msg"`
+}
+
 type Msg struct {
-	Code    uint32      `json:"code"`
-	Message string      `json:"message"`
-	Data    interface{} `json:"data"`
+	Meta Meta        `json:"meta"`
+	Data interface{} `json:"data"`
 }
 
 func NewMsg(code uint32, message string, data interface{}) *Msg {
 	return &Msg{
-		Code:    code,
-		Message: message,
+		Meta: Meta{
+			ErrCode: code,
+			ErrMsg:  message,
+		},
 		Data:    data,
 	}
 }
