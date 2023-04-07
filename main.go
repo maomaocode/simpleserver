@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
 
@@ -18,7 +19,7 @@ type (
 	}
 
 	UploadFormReq struct {
-		Address      string        `json:"address"`
+		ID           string        `json:"id"`
 		QuestAnswers []QuestAnswer `json:"quest_answers"`
 	}
 
@@ -26,7 +27,7 @@ type (
 	}
 
 	CheckIsRegisteredReq struct {
-		Address string `json:"address"`
+		ID string `json:"id"`
 	}
 
 	CheckIsRegisteredRes struct {
@@ -56,9 +57,12 @@ func NewMsg(code uint32, message string, data interface{}) *Msg {
 
 func main() {
 	r := gin.Default()
-	r.Use(Cors())
 
-	r.GET("/ping", func(c *gin.Context) {
+	config := cors.DefaultConfig()
+	config.AllowAllOrigins = true
+	r.Use(cors.New(config))
+
+	r.GET("/api/v1/ping", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"msg": NewMsg(0, "success", "pong"),
 		})
@@ -72,7 +76,7 @@ func main() {
 		panic(err)
 	}
 
-	r.POST("/uploadForm", func(context *gin.Context) {
+	r.POST("/api/v1/uploadForm", func(context *gin.Context) {
 		data, _ := ioutil.ReadAll(context.Request.Body)
 
 		req := UploadFormReq{}
@@ -83,7 +87,7 @@ func main() {
 			return
 		}
 
-		if saver.Exist(req.Address) {
+		if saver.Exist(req.ID) {
 			context.JSON(200, gin.H{
 				"msg": NewMsg(2, "already registered", nil)})
 			return
@@ -92,14 +96,14 @@ func main() {
 
 		afterMarshal, _ := json.Marshal(req)
 
-		saver.write(req.Address, string(afterMarshal))
+		saver.write(req.ID, string(afterMarshal))
 
 		context.JSON(200, gin.H{
 			"msg": NewMsg(0, "success", &UploadFormRes{}),
 		})
 	})
 
-	r.POST("/checkIsRegistered", func(context *gin.Context) {
+	r.POST("/api/v1/checkIsRegistered", func(context *gin.Context) {
 		data, _ := ioutil.ReadAll(context.Request.Body)
 
 		req := CheckIsRegisteredReq{}
@@ -111,10 +115,10 @@ func main() {
 		}
 
 		context.JSON(200, gin.H{
-			"msg": NewMsg(0, "success", &CheckIsRegisteredRes{Result: saver.Exist(req.Address)})})
+			"msg": NewMsg(0, "success", &CheckIsRegisteredRes{Result: saver.Exist(req.ID)})})
 	})
 
-	go r.Run()
+	go r.Run(":8080")
 
 	c := make(chan os.Signal)
 	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
@@ -124,7 +128,6 @@ func main() {
 		case sig := <-c:
 			switch sig {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				// 这里做一些清理操作或者输出相关说明，比如 断开数据库连接
 				fmt.Println("receive exit signal ", sig.String(), ",exit...")
 				return
 			}

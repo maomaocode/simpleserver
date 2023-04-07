@@ -43,7 +43,7 @@ func NewSaver(path string) *Saver {
 				continue
 			}
 
-			addressSet[r.Address] = struct{}{}
+			addressSet[r.ID] = struct{}{}
 		}
 
 		return nil
